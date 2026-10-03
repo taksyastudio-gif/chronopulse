@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoPulse - Timer & Stopwatch</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.6);
+        }
+
+        /* Glassmorphism card styles */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .dark .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Tabular numbers for non-jittering clock updates */
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* SVG Circle progress animation smooth transition */
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s linear, stroke 0.3s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* Alarm flashing animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.98); opacity: 0.8; }
+            50% { transform: scale(1.02); opacity: 1; }
+            100% { transform: scale(0.98); opacity: 0.8; }
+        }
+        .alarm-active {
+            animation: pulse-ring 1s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 flex flex-col justify-between items-center p-4 sm:p-6 md:p-8">
+
+    <!-- Top Navigation Header -->
+    <header class="w-full max-w-2xl flex items-center justify-between mb-6">
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">ChronoPulse</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-4 link-none">Precision Time Engine</p>
+            </div>
+        </div>
+
+        <!-- Header Actions: Sound & Theme Toggle -->
+        <div class="flex items-center space-x-2">
+            <!-- Sound Toggle Button -->
+            <button id="soundToggleBtn" title="Toggle Alarm Audio" class="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 shadow-sm transition-all text-slate-600 dark:text-slate-300">
+                <svg id="soundOnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                </svg>
+                <svg id="soundOffIcon" class="w-5 h-5 hidden text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+            </button>
+
+            <!-- Theme Switcher -->
+            <button id="themeToggleBtn" title="Toggle Theme" class="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 shadow-sm transition-all text-slate-600 dark:text-slate-300">
+                <svg id="sunIcon" class="w-5 h-5 hidden text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <svg id="moonIcon" class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Application Card -->
+    <main class="w-full max-w-2xl glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl transition-all duration-300">
+        
+        <!-- Tab Navigation Switcher -->
+        <div class="flex p-1.5 mb-8 bg-slate-200/60 dark:bg-slate-800/60 rounded-2xl border border-slate-300/40 dark:border-slate-700/40">
+            <button id="tabTimerBtn" class="flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm bg-white dark:bg-slate-700 text-blue-600 dark:text-white flex items-center justify-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span>Timer</span>
+            </button>
+            <button id="tabStopwatchBtn" class="flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span>Stopwatch</span>
+            </button>
+        </div>
+
+        <!-- VIEW 1: COUNTDOWN TIMER -->
+        <section id="timerView" class="flex flex-col items-center">
+            
+            <!-- SVG Circular Progress Bar with Time Display inside -->
+            <div class="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center my-4">
+                <svg class="w-full h-full" viewBox="0 0 320 320">
+                    <!-- Background Circle track -->
+                    <circle 
+                        cx="160" cy="160" r="140" 
+                        class="text-slate-200 dark:text-slate-800/80"
+                        stroke-width="12" 
+                        stroke="currentColor" 
+                        fill="transparent" 
+                    />
+                    <!-- Dynamic Progress Circle -->
+                    <circle 
+                        id="timerRing"
+                        cx="160" cy="160" r="140" 
+                        class="progress-ring-circle text-blue-600 dark:text-blue-500"
+                        stroke-width="12" 
+                        stroke-linecap="round"
+                        stroke="currentColor" 
+                        fill="transparent" 
+                        stroke-dasharray="879.64"
+                        stroke-dashoffset="0"
+                    />
+                </svg>
+
+                <!-- Center Display Container -->
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
+                    <!-- Numerical Display -->
+                    <div id="timerDisplay" class="font-mono text-4xl sm:text-5xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
+                        00:25:00
+                    </div>
+                    <!-- Status Label -->
+                    <div id="timerStatus" class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-2 uppercase tracking-widest">
+                        Ready
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preset Quick Selector Buttons -->
+            <div id="presetButtons" class="flex flex-wrap justify-center gap-2 my-4 w-full">
+                <button data-time="1500" class="preset-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-200/80 dark:bg-slate-800/80 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-colors">
+                    Pomodoro (25m)
+                </button>
+                <button data-time="300" class="preset-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-200/80 dark:bg-slate-800/80 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-colors">
+                    Short Break (5m)
+                </button>
+                <button data-time="900" class="preset-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-200/80 dark:bg-slate-800/80 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-colors">
+                    Long Break (15m)
+                </button>
+                <button id="add1mBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white transition-colors">
+                    +1m
+                </button>
+                <button id="add5mBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white transition-colors">
+                    +5m
+                </button>
+            </div>
+
+            <!-- Custom Duration Input Section (H / M / S Spinners) -->
+            <div id="timerInputContainer" class="flex items-center space-x-2 my-2 transition-all duration-300">
+                <div class="flex flex-col items-center">
+                    <label class="text-[10px] uppercase font-bold text-slate-400 mb-1">Hours</label>
+                    <input type="number" id="inputHours" min="0" max="99" value="0" class="w-16 h-10 text-center font-mono font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100">
+                </div>
+                <span class="text-xl font-bold mt-4 text-slate-400">:</span>
+                <div class="flex flex-col items-center">
+                    <label class="text-[10px] uppercase font-bold text-slate-400 mb-1">Mins</label>
+                    <input type="number" id="inputMinutes" min="0" max="59" value="25" class="w-16 h-10 text-center font-mono font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100">
+                </div>
+                <span class="text-xl font-bold mt-4 text-slate-400">:</span>
+                <div class="flex flex-col items-center">
+                    <label class="text-[10px] uppercase font-bold text-slate-400 mb-1">Secs</label>
+                    <input type="number" id="inputSeconds" min="0" max="59" value="0" class="w-16 h-10 text-center font-mono font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100">
+                </div>
+            </div>
+
+            <!-- Primary Controls for Timer -->
+            <div class="flex items-center justify-center space-x-4 mt-6 w-full">
+                <button id="timerResetBtn" class="px-6 py-3 rounded-2xl font-semibold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all flex items-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span>Reset</span>
+                </button>
+
+                <button id="timerStartBtn" class="px-8 py-3 rounded-2xl font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/30 transition-all flex items-center space-x-2 min-w-[140px] justify-center">
+                    <svg id="timerPlayIcon" class="w-5 h-5 fill-current" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
+                    </svg>
+                    <svg id="timerPauseIcon" class="w-5 h-5 hidden fill-current" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <span id="timerStartBtnText">Start</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- VIEW 2: STOPWATCH -->
+        <section id="stopwatchView" class="hidden flex flex-col items-center">
+            
+            <!-- Stopwatch Millisecond Display -->
+            <div class="my-8 text-center">
+                <div id="stopwatchDisplay" class="font-mono text-5xl sm:text-6xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
+                    00:00:00<span class="text-3xl sm:text-4xl text-blue-600 dark:text-blue-400">.00</span>
+                </div>
+                <div id="currentLapDisplay" class="text-xs sm:text-sm font-mono text-slate-500 dark:text-slate-400 mt-3 tabular-nums">
+                    Lap 1: 00:00.00
+                </div>
+            </div>
+
+            <!-- Stopwatch Main Controls -->
+            <div class="flex items-center justify-center space-x-3 mb-8 w-full">
+                <!-- Reset Button -->
+                <button id="swResetBtn" class="px-5 py-3 rounded-2xl font-semibold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all flex items-center space-x-1.5">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span>Reset</span>
+                </button>
+
+                <!-- Lap Button -->
+                <button id="swLapBtn" disabled class="px-5 py-3 rounded-2xl font-semibold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1.5">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
+                    </svg>
+                    <span>Lap</span>
+                </button>
+
+                <!-- Start/Pause Button -->
+                <button id="swStartBtn" class="px-7 py-3 rounded-2xl font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/30 transition-all flex items-center space-x-2 min-w-[130px] justify-center">
+                    <svg id="swPlayIcon" class="w-5 h-5 fill-current" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
+                    </svg>
+                    <svg id="swPauseIcon" class="w-5 h-5 hidden fill-current" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <span id="swStartBtnText">Start</span>
+                </button>
+            </div>
+
+            <!-- Lap History Table Container -->
+            <div id="lapTableContainer" class="w-full max-h-56 overflow-y-auto pr-1 hidden border-t border-slate-200 dark:border-slate-800 pt-4">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+                            <th class="py-2 px-3 font-semibold">Lap #</th>
+                            <th class="py-2 px-3 font-semibold">Lap Time</th>
+                            <th class="py-2 px-3 font-semibold text-right">Overall Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lapList" class="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono tabular-nums">
+                        <!-- Lap rows inserted dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Keyboard Shortcut Bar -->
+    <footer class="w-full max-w-2xl mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center space-x-1">
+            <kbd class="px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 font-mono font-semibold border border-slate-300 dark:border-slate-700 text-[10px]">SPACE</kbd>
+            <span>Start / Pause</span>
+        </div>
+        <div class="flex items-center space-x-1">
+            <kbd class="px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 font-mono font-semibold border border-slate-300 dark:border-slate-700 text-[10px]">R</kbd>
+            <span>Reset</span>
+        </div>
+        <div class="flex items-center space-x-1">
+            <kbd class="px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 font-mono font-semibold border border-slate-300 dark:border-slate-700 text-[10px]">L</kbd>
+            <span>Record Lap</span>
+        </div>
+    </footer>
+
+    <script>
+        // --- APPLICATION STATE ---
+        let currentMode = 'timer'; // 'timer' or 'stopwatch'
+        let audioEnabled = true;
+
+        // Timer State Variables
+        let timerInterval = null;
+        let timerTotalSeconds = 1500; // Default 25m
+        let timerRemainingSeconds = 1500;
+        let isTimerRunning = false;
+        const ringCircle = document.getElementById('timerRing');
+        const circumference = 2 * Math.PI * 140; // r = 140 -> ~879.64
+
+        // Stopwatch State Variables
+        let swInterval = null;
+        let swStartTime = 0;
+        let swElapsedTime = 0;
+        let swIsRunning = false;
+        let laps = [];
+        let lastLapTime = 0;
+
+        // Synthetic Alarm Sound Generator (Web Audio API)
+        function playAlarmSound() {
+            if (!audioEnabled) return;
+
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioCtx();
+
+                const now = ctx.currentTime;
+                // Pleasant chime sequence (C5, E5, G5, C6)
+                const frequencies = [523.25, 659.25, 783.99, 1046.50];
+
+                frequencies.forEach((freq, index) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + index * 0.15);
+
+                    // Envelope
+                    gain.gain.setValueAtTime(0, now + index * 0.15);
+                    gain.gain.linearRampToValueAtTime(0.3, now + index * 0.15 + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.15 + 0.6);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now + index * 0.15);
+                    osc.stop(now + index * 0.15 + 0.6);
+                });
+            } catch (e) {
+                console.error("Web Audio API not supported or blocked", e);
+            }
+        }
+
+        // Theme Dark/Light Toggle
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+
+        themeToggleBtn.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            sunIcon.classList.toggle('hidden', !isDark);
+            moonIcon.classList.toggle('hidden', isDark);
+        });
+
+        // Sound Toggle
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundOnIcon = document.getElementById('soundOnIcon');
+        const soundOffIcon = document.getElementById('soundOffIcon');
+
+        soundToggleBtn.addEventListener('click', () => {
+            audioEnabled = !audioEnabled;
+            soundOnIcon.classList.toggle('hidden', !audioEnabled);
+            soundOffIcon.classList.toggle('hidden', audioEnabled);
+        });
+
+        // Tab Switching
+        const tabTimerBtn = document.getElementById('tabTimerBtn');
+        const tabStopwatchBtn = document.getElementById('tabStopwatchBtn');
+        const timerView = document.getElementById('timerView');
+        const stopwatchView = document.getElementById('stopwatchView');
+
+        function switchTab(mode) {
+            currentMode = mode;
+            if (mode === 'timer') {
+                timerView.classList.remove('hidden');
+                stopwatchView.classList.add('hidden');
+
+                tabTimerBtn.className = "flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm bg-white dark:bg-slate-700 text-blue-600 dark:text-white flex items-center justify-center space-x-2";
+                tabStopwatchBtn.className = "flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center space-x-2";
+            } else {
+                timerView.classList.add('hidden');
+                stopwatchView.classList.remove('hidden');
+
+                tabStopwatchBtn.className = "flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm bg-white dark:bg-slate-700 text-blue-600 dark:text-white flex items-center justify-center space-x-2";
+                tabTimerBtn.className = "flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center space-x-2";
+            }
+        }
+
+        tabTimerBtn.addEventListener('click', () => switchTab('timer'));
+        tabStopwatchBtn.addEventListener('click', () => switchTab('stopwatch'));
+
+        // --- COUNTDOWN TIMER LOGIC ---
+        const timerDisplay = document.getElementById('timerDisplay');
+        const timerStatus = document.getElementById('timerStatus');
+        const timerStartBtn = document.getElementById('timerStartBtn');
+        const timerStartBtnText = document.getElementById('timerStartBtnText');
+        const timerPlayIcon = document.getElementById('timerPlayIcon');
+        const timerPauseIcon = document.getElementById('timerPauseIcon');
+        const timerResetBtn = document.getElementById('timerResetBtn');
+
+        const inputHours = document.getElementById('inputHours');
+        const inputMinutes = document.getElementById('inputMinutes');
+        const inputSeconds = document.getElementById('inputSeconds');
+        const timerInputContainer = document.getElementById('timerInputContainer');
+
+        function formatTimeHHMMSS(totalSecs) {
+            const h = Math.floor(totalSecs / 3600);
+            const m = Math.floor((totalSecs % 3600) / 60);
+            const s = totalSecs % 60;
+
+            const pad = (num) => String(num).padStart(2, '0');
+            if (h > 0) {
+                return `${pad(h)}:${pad(m)}:${pad(s)}`;
+            }
+            return `${pad(m)}:${pad(s)}`;
+        }
+
+        function updateTimerRingProgress() {
+            if (timerTotalSeconds <= 0) {
+                ringCircle.style.strokeDashoffset = 0;
+                return;
+            }
+            const fraction = timerRemainingSeconds / timerTotalSeconds;
+            const offset = circumference - (fraction * circumference);
+            ringCircle.style.strokeDashoffset = offset;
+        }
+
+        function updateTimerUI() {
+            timerDisplay.textContent = formatTimeHHMMSS(timerRemainingSeconds);
+            updateTimerRingProgress();
+        }
+
+        function readInputsToTotalSeconds() {
+            const h = parseInt(inputHours.value) || 0;
+            const m = parseInt(inputMinutes.value) || 0;
+            const s = parseInt(inputSeconds.value) || 0;
+            return (h * 3600) + (m * 60) + s;
+        }
+
+        function setTimerDuration(secs) {
+            if (isTimerRunning) pauseTimer();
+            timerTotalSeconds = secs;
+            timerRemainingSeconds = secs;
+
+            // Sync inputs
+            const h = Math.floor(secs / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            const s = secs % 60;
+            inputHours.value = h;
+            inputMinutes.value = m;
+            inputSeconds.value = s;
+
+            timerStatus.textContent = "Ready";
+            timerStatus.classList.remove('alarm-active', 'text-rose-500');
+            updateTimerUI();
+        }
+
+        function startTimer() {
+            if (timerRemainingSeconds <= 0) {
+                const customSecs = readInputsToTotalSeconds();
+                if (customSecs <= 0) return;
+                setTimerDuration(customSecs);
+            }
+
+            isTimerRunning = true;
+            timerStartBtnText.textContent = "Pause";
+            timerPlayIcon.classList.add('hidden');
+            timerPauseIcon.classList.remove('hidden');
+            timerStartBtn.classList.replace('bg-blue-600', 'bg-amber-600');
+            timerStartBtn.classList.replace('hover:bg-blue-700', 'hover:bg-amber-700');
+            timerInputContainer.classList.add('opacity-40', 'pointer-events-none');
+            timerStatus.textContent = "Focusing";
+
+            const targetEndTime = Date.now() + (timerRemainingSeconds * 1000);
+
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                timerRemainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
+                updateTimerUI();
+
+                if (timerRemainingSeconds <= 0) {
+                    onTimerComplete();
+                }
+            }, 250);
+        }
+
+        function pauseTimer() {
+            isTimerRunning = false;
+            clearInterval(timerInterval);
+            timerStartBtnText.textContent = "Resume";
+            timerPlayIcon.classList.remove('hidden');
+            timerPauseIcon.classList.add('hidden');
+            timerStartBtn.classList.replace('bg-amber-600', 'bg-blue-600');
+            timerStartBtn.classList.replace('hover:bg-amber-700', 'hover:bg-blue-700');
+            timerStatus.textContent = "Paused";
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            timerStartBtnText.textContent = "Start";
+            timerInputContainer.classList.remove('opacity-40', 'pointer-events-none');
+            const customSecs = readInputsToTotalSeconds();
+            setTimerDuration(customSecs > 0 ? customSecs : 1500);
+        }
+
+        function onTimerComplete() {
+            pauseTimer();
+            timerStartBtnText.textContent = "Start";
+            timerStatus.textContent = "Time's Up!";
+            timerStatus.classList.add('alarm-active', 'text-rose-500');
+            timerInputContainer.classList.remove('opacity-40', 'pointer-events-none');
+            playAlarmSound();
+        }
+
+        // Timer Event Listeners
+        timerStartBtn.addEventListener('click', () => {
+            if (isTimerRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        });
+
+        timerResetBtn.addEventListener('click', resetTimer);
+
+        // Input Changes
+        [inputHours, inputMinutes, inputSeconds].forEach(input => {
+            input.addEventListener('change', () => {
+                let secs = readInputsToTotalSeconds();
+                setTimerDuration(secs);
+            });
+        });
+
+        // Preset Button Clicks
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const secs = parseInt(e.target.dataset.time);
+                setTimerDuration(secs);
+            });
+        });
+
+        document.getElementById('add1mBtn').addEventListener('click', () => {
+            timerRemainingSeconds += 60;
+            timerTotalSeconds += 60;
+            updateTimerUI();
+        });
+
+        document.getElementById('add5mBtn').addEventListener('click', () => {
+            timerRemainingSeconds += 300;
+            timerTotalSeconds += 300;
+            updateTimerUI();
+        });
+
+        // --- STOPWATCH LOGIC ---
+        const stopwatchDisplay = document.getElementById('stopwatchDisplay');
+        const currentLapDisplay = document.getElementById('currentLapDisplay');
+        const swStartBtn = document.getElementById('swStartBtn');
+        const swStartBtnText = document.getElementById('swStartBtnText');
+        const swPlayIcon = document.getElementById('swPlayIcon');
+        const swPauseIcon = document.getElementById('swPauseIcon');
+        const swResetBtn = document.getElementById('swResetBtn');
+        const swLapBtn = document.getElementById('swLapBtn');
+        const lapTableContainer = document.getElementById('lapTableContainer');
+        const lapList = document.getElementById('lapList');
+
+        function formatStopwatchTime(ms) {
+            const hrs = Math.floor(ms / 3600000);
+            const mins = Math.floor((ms % 3600000) / 60000);
+            const secs = Math.floor((ms % 60000) / 1000);
+            const millis = Math.floor((ms % 1000) / 10);
+
+            const pad = (n) => String(n).padStart(2, '0');
+            const mainStr = `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+            const subStr = `.${pad(millis)}`;
+            return { mainStr, subStr };
+        }
+
+        function updateStopwatchUI() {
+            const formatted = formatStopwatchTime(swElapsedTime);
+            stopwatchDisplay.innerHTML = `${formatted.mainStr}<span class="text-3xl sm:text-4xl text-blue-600 dark:text-blue-400">${formatted.subStr}</span>`;
+
+            if (swIsRunning || laps.length > 0) {
+                const currentLapDuration = swElapsedTime - lastLapTime;
+                const lapFormatted = formatStopwatchTime(currentLapDuration);
+                currentLapDisplay.textContent = `Lap ${laps.length + 1}: ${lapFormatted.mainStr}${lapFormatted.subStr}`;
+            } else {
+                currentLapDisplay.textContent = `Lap 1: 00:00:00.00`;
+            }
+        }
+
+        function startStopwatch() {
+            swIsRunning = true;
+            swStartTime = Date.now() - swElapsedTime;
+            swStartBtnText.textContent = "Pause";
+            swPlayIcon.classList.add('hidden');
+            swPauseIcon.classList.remove('hidden');
+            swStartBtn.classList.replace('bg-blue-600', 'bg-amber-600');
+            swStartBtn.classList.replace('hover:bg-blue-700', 'hover:bg-amber-700');
+            swLapBtn.disabled = false;
+
+            swInterval = setInterval(() => {
+                swElapsedTime = Date.now() - swStartTime;
+                updateStopwatchUI();
+            }, 10);
+        }
+
+        function pauseStopwatch() {
+            swIsRunning = false;
+            clearInterval(swInterval);
+            swStartBtnText.textContent = "Resume";
+            swPlayIcon.classList.remove('hidden');
+            swPauseIcon.classList.add('hidden');
+            swStartBtn.classList.replace('bg-amber-600', 'bg-blue-600');
+            swStartBtn.classList.replace('hover:bg-amber-700', 'hover:bg-blue-700');
+            swLapBtn.disabled = true;
+        }
+
+        function resetStopwatch() {
+            pauseStopwatch();
+            swStartBtnText.textContent = "Start";
+            swElapsedTime = 0;
+            lastLapTime = 0;
+            laps = [];
+            lapList.innerHTML = '';
+            lapTableContainer.classList.add('hidden');
+            swLapBtn.disabled = true;
+            updateStopwatchUI();
+        }
+
+        function recordLap() {
+            if (!swIsRunning) return;
+
+            const lapDuration = swElapsedTime - lastLapTime;
+            lastLapTime = swElapsedTime;
+
+            laps.unshift({
+                number: laps.length + 1,
+                duration: lapDuration,
+                totalTime: swElapsedTime
+            });
+
+            renderLaps();
+        }
+
+        function renderLaps() {
+            if (laps.length === 0) {
+                lapTableContainer.classList.add('hidden');
+                return;
+            }
+            lapTableContainer.classList.remove('hidden');
+
+            // Find fastest and slowest duration
+            let minDuration = Infinity;
+            let maxDuration = -1;
+
+            if (laps.length > 1) {
+                laps.forEach(l => {
+                    if (l.duration < minDuration) minDuration = l.duration;
+                    if (l.duration > maxDuration) maxDuration = l.duration;
+                });
+            }
+
+            lapList.innerHTML = laps.map(lap => {
+                const lapF = formatStopwatchTime(lap.duration);
+                const totalF = formatStopwatchTime(lap.totalTime);
+
+                let badgeClass = "text-slate-700 dark:text-slate-300";
+                let highlightLabel = "";
+
+                if (laps.length > 1) {
+                    if (lap.duration === minDuration) {
+                        badgeClass = "text-emerald-600 dark:text-emerald-400 font-bold";
+                        highlightLabel = `<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 uppercase">Fastest</span>`;
+                    } else if (lap.duration === maxDuration) {
+                        badgeClass = "text-rose-600 dark:text-rose-400 font-bold";
+                        highlightLabel = `<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 uppercase">Slowest</span>`;
+                    }
+                }
+
+                return `
+                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td class="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Lap ${lap.number}</td>
+                        <td class="py-2.5 px-3 ${badgeClass}">
+                            ${lapF.mainStr}${lapF.subStr} ${highlightLabel}
+                        </td>
+                        <td class="py-2.5 px-3 text-right text-slate-600 dark:text-slate-300">
+                            ${totalF.mainStr}${totalF.subStr}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Stopwatch Event Listeners
+        swStartBtn.addEventListener('click', () => {
+            if (swIsRunning) {
+                pauseStopwatch();
+            } else {
+                startStopwatch();
+            }
+        });
+
+        swResetBtn.addEventListener('click', resetStopwatch);
+        swLapBtn.addEventListener('click', recordLap);
+
+        // --- KEYBOARD SHORTCUTS ---
+        document.addEventListener('keydown', (e) => {
+            // Ignore if input field is active
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (currentMode === 'timer') {
+                    timerStartBtn.click();
+                } else {
+                    swStartBtn.click();
+                }
+            } else if (e.code === 'KeyR') {
+                e.preventDefault();
+                if (currentMode === 'timer') {
+                    resetTimer();
+                } else {
+                    resetStopwatch();
+                }
+            } else if (e.code === 'KeyL') {
+                if (currentMode === 'stopwatch' && swIsRunning) {
+                    e.preventDefault();
+                    recordLap();
+                }
+            }
+        });
+
+        // Initial setup
+        setTimerDuration(1500);
+        updateStopwatchUI();
+    </script>
+</body>
+</html>
